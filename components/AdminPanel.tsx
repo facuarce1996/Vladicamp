@@ -2,12 +2,12 @@ import React, { useRef, useEffect, useState } from 'react';
 import { QUESTIONS } from '../constants';
 import { Submission } from '../types';
 import { Logo } from './Logo';
-import { LogOut, Upload, Trash2, Download, Smartphone, Undo2, Loader2, RefreshCcw, Database, Save } from 'lucide-react';
+import { LogOut, Link as LinkIcon, Trash2, Download, Smartphone, Undo2, Loader2, RefreshCcw, Database, Save, ImagePlus } from 'lucide-react';
 import { supabase } from '../services/supabaseClient';
 
 interface AdminPanelProps {
   logoSrc: string | null;
-  onUpdateLogo: (file: File) => void;
+  onUpdateLogo: (url: string) => void;
   onLogout: () => void;
   onResetDevice: () => void;
 }
@@ -18,13 +18,16 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
   onLogout,
   onResetDevice
 }) => {
-  const fileInputRef = useRef<HTMLInputElement>(null);
   const [submissions, setSubmissions] = useState<Submission[]>([]);
   const [loading, setLoading] = useState(true);
   
   // DB Config State
   const [dbUrl, setDbUrl] = useState('');
   const [dbKey, setDbKey] = useState('');
+  
+  // Global Logo State
+  const [newLogoUrl, setNewLogoUrl] = useState('');
+  const [savingLogo, setSavingLogo] = useState(false);
 
   const fetchSubmissions = async () => {
     setLoading(true);
@@ -35,13 +38,15 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
 
     if (error) {
       console.error("Error fetching votes:", error);
-      // Don't alert immediately on load to avoid spamming if not configured
     } else {
-      const formattedData: Submission[] = (data || []).map((row: any) => ({
-        email: row.email,
-        timestamp: row.created_at,
-        votes: row.votes
-      }));
+      // Filter out the configuration row and format data
+      const formattedData: Submission[] = (data || [])
+        .filter((row: any) => row.email !== 'admin_config') // Hide config row
+        .map((row: any) => ({
+          email: row.email,
+          timestamp: row.created_at,
+          votes: row.votes
+        }));
       setSubmissions(formattedData);
     }
     setLoading(false);
@@ -55,6 +60,8 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
     const storedKey = localStorage.getItem('vladicamp_supabase_key');
     if(storedUrl) setDbUrl(storedUrl);
     if(storedKey) setDbKey(storedKey);
+    
+    if (logoSrc) setNewLogoUrl(logoSrc);
   }, []);
 
   const handleSaveDbConfig = () => {
@@ -68,20 +75,46 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
     window.location.reload();
   };
 
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (e.target.files && e.target.files[0]) {
-      onUpdateLogo(e.target.files[0]);
+  const handleSaveLogoGlobal = async () => {
+    if (!newLogoUrl) return;
+    setSavingLogo(true);
+    
+    try {
+      // 1. Save to Database (Global)
+      // We use a specific email 'admin_config' to store settings without creating a new table
+      
+      // First delete old config to avoid duplicates if ID is auto-generated
+      await supabase.from('votes').delete().eq('email', 'admin_config');
+      
+      // Insert new config
+      const { error } = await supabase.from('votes').insert({
+        email: 'admin_config',
+        votes: { logo_url: newLogoUrl } // We store the URL inside the votes JSON column
+      });
+
+      if (error) throw error;
+
+      // 2. Update local state
+      onUpdateLogo(newLogoUrl);
+      alert("Logo actualizado globalmente. Todos los dispositivos verán este logo.");
+      
+    } catch (err: any) {
+      console.error("Error saving logo:", err);
+      alert("Error guardando logo en la nube: " + err.message);
+    } finally {
+      setSavingLogo(false);
     }
   };
 
   const handleClearData = async () => {
     if(window.confirm('ATENCIÓN: Esto borrará TODOS los registros de la base de datos de Nube permanentemente. ¿Estás seguro?')) {
-       const { error } = await supabase.from('votes').delete().neq('id', 0);
+       // Delete everything EXCEPT the config
+       const { error } = await supabase.from('votes').delete().neq('email', 'admin_config');
        if (error) {
          alert("Error borrando datos (Revisar permisos RLS): " + (error.message || "Desconocido"));
        } else {
          setSubmissions([]);
-         alert("Base de datos limpiada.");
+         alert("Base de datos limpiada (Configuración preservada).");
        }
     }
   };
@@ -167,7 +200,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                 </button>
             </div>
             <p className="text-xs text-slate-500 mt-2">
-                * Si usas Vercel con variables de entorno, esto no es necesario. Úsalo si te aparece "Error [object Object]".
+                * Si usas Vercel con variables de entorno, esto no es necesario.
             </p>
         </div>
 
@@ -175,37 +208,47 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
             
             {/* Logo Configuration */}
-            <div className="bg-slate-800 p-6 rounded-2xl border border-slate-700 shadow-xl h-full">
-            <h2 className="text-xl font-bold text-white mb-6 flex items-center gap-2">
-                <Upload size={20} className="text-yellow-500" />
-                Configuración de Logo
-            </h2>
-            
-            <div className="flex flex-col sm:flex-row items-center gap-6">
-                <div className="flex-1 w-full">
-                <div className="bg-slate-900/50 border-2 border-dashed border-slate-600 rounded-xl p-6 flex flex-col items-center justify-center text-center hover:border-yellow-500/50 transition-colors group cursor-pointer h-40"
-                    onClick={() => fileInputRef.current?.click()}>
-                    <input 
-                    type="file" 
-                    ref={fileInputRef} 
-                    onChange={handleFileChange} 
-                    accept="image/*" 
-                    className="hidden" 
-                    />
-                    <div className="bg-slate-800 p-3 rounded-full mb-3 group-hover:bg-slate-700 transition-colors">
-                    <Upload className="text-slate-400 group-hover:text-yellow-500 transition-colors" size={20} />
+            <div className="bg-slate-800 p-6 rounded-2xl border border-slate-700 shadow-xl h-full flex flex-col">
+              <h2 className="text-xl font-bold text-white mb-6 flex items-center gap-2">
+                  <ImagePlus size={20} className="text-yellow-500" />
+                  Logo Global (Visible en todos los celulares)
+              </h2>
+              
+              <div className="flex-1 space-y-6">
+                <div className="space-y-2">
+                  <label className="text-sm font-medium text-slate-400">URL de la Imagen (Link)</label>
+                  <div className="flex gap-2">
+                    <div className="relative flex-1">
+                      <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-500">
+                        <LinkIcon size={16} />
+                      </div>
+                      <input 
+                        type="text" 
+                        value={newLogoUrl} 
+                        onChange={(e) => setNewLogoUrl(e.target.value)} 
+                        placeholder="https://i.imgur.com/..." 
+                        className="w-full bg-slate-900 border border-slate-600 rounded-lg pl-10 pr-4 py-2 text-white focus:outline-none focus:ring-2 focus:ring-yellow-500"
+                      />
                     </div>
-                    <p className="text-slate-300 font-medium text-sm">Subir nuevo logo</p>
-                </div>
+                    <button 
+                      onClick={handleSaveLogoGlobal}
+                      disabled={savingLogo || !newLogoUrl}
+                      className="bg-yellow-500 hover:bg-yellow-400 text-slate-900 px-4 py-2 rounded-lg font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+                    >
+                      {savingLogo ? <Loader2 className="animate-spin" size={18} /> : <Save size={18} />}
+                      Guardar
+                    </button>
+                  </div>
+                  <p className="text-xs text-slate-500">
+                    Sube tu imagen a <a href="https://imgbb.com/" target="_blank" rel="noopener noreferrer" className="text-yellow-500 underline">imgbb.com</a> y pega el "Enlace directo" aquí.
+                  </p>
                 </div>
                 
-                <div className="flex-1 flex flex-col items-center justify-center bg-slate-900/50 rounded-xl p-6 border border-slate-700 h-40 w-full relative group">
+                <div className="flex flex-col items-center justify-center bg-slate-900/50 rounded-xl p-6 border border-slate-700 min-h-[160px] relative group">
+                    <p className="text-xs text-slate-500 absolute top-2 left-2">Vista previa actual:</p>
                     {logoSrc && (
                        <button 
-                         onClick={() => {
-                             localStorage.removeItem('vladicamp_logo');
-                             window.location.reload();
-                         }}
+                         onClick={() => onUpdateLogo('')}
                          className="absolute top-2 right-2 bg-slate-800 text-slate-400 hover:text-white p-1 rounded-md opacity-0 group-hover:opacity-100 transition-opacity"
                          title="Restaurar Logo Original"
                        >
@@ -214,7 +257,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                     )}
                     <Logo size="lg" customSrc={logoSrc} className="transform scale-75" />
                 </div>
-            </div>
+              </div>
             </div>
 
             {/* Testing Actions */}
@@ -243,7 +286,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                      <div className="flex items-start justify-between gap-4">
                         <div>
                             <h3 className="font-medium text-red-400">Borrar Base de Datos</h3>
-                            <p className="text-sm text-slate-500 mt-1">Elimina permanentemente los registros de Supabase.</p>
+                            <p className="text-sm text-slate-500 mt-1">Elimina los votos (Mantiene la config del logo).</p>
                         </div>
                         <button 
                             onClick={handleClearData}

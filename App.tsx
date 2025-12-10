@@ -22,12 +22,32 @@ export default function App() {
   // Admin & Persistence State
   const [logoSrc, setLogoSrc] = useState<string | null>(null);
 
-  // Load local settings on mount
+  // Load local settings on mount AND Global Config from DB
   useEffect(() => {
-    const savedLogo = localStorage.getItem('vladicamp_logo');
-    if (savedLogo) {
-      setLogoSrc(savedLogo);
-    }
+    const fetchGlobalConfig = async () => {
+       try {
+         // Check local storage first
+         const savedLogo = localStorage.getItem('vladicamp_logo');
+         if (savedLogo) setLogoSrc(savedLogo);
+
+         // Fetch global config from DB (admin_config row)
+         // We do this to sync logo across devices
+         const { data, error } = await supabase
+           .from('votes')
+           .select('votes')
+           .eq('email', 'admin_config')
+           .single();
+         
+         if (data && data.votes && data.votes.logo_url) {
+            setLogoSrc(data.votes.logo_url);
+            localStorage.setItem('vladicamp_logo', data.votes.logo_url);
+         }
+       } catch (e) {
+         console.error("Error loading config", e);
+       }
+    };
+
+    fetchGlobalConfig();
 
     // Try to restore draft votes if not submitted
     if (localStorage.getItem('vladicamp_device_voted') !== 'true') {
@@ -90,14 +110,13 @@ export default function App() {
     }
   };
 
-  const handleUpdateLogo = (file: File) => {
-    const reader = new FileReader();
-    reader.onloadend = () => {
-      const base64String = reader.result as string;
-      setLogoSrc(base64String);
-      localStorage.setItem('vladicamp_logo', base64String);
-    };
-    reader.readAsDataURL(file);
+  const handleUpdateLogo = (url: string) => {
+    setLogoSrc(url);
+    if(url) {
+        localStorage.setItem('vladicamp_logo', url);
+    } else {
+        localStorage.removeItem('vladicamp_logo');
+    }
   };
 
   // Helper for admin to reset their own device lock for testing
