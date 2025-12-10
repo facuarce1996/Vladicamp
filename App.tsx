@@ -115,13 +115,13 @@ export default function App() {
     
     try {
       // 1. Save to Supabase
+      // NOTE: Removed 'timestamp' field. Supabase uses 'created_at' default column automatically.
       const { error } = await supabase
         .from('votes')
         .insert([
           { 
             email: email || "Anónimo",
-            votes: votes,
-            timestamp: new Date().toISOString()
+            votes: votes
           }
         ]);
 
