@@ -2,9 +2,11 @@ import { createClient } from '@supabase/supabase-js';
 
 // Acceso seguro a variables de entorno para evitar "Cannot read properties of undefined"
 const getEnvVar = (key: string) => {
-  // Verificación defensiva de import.meta
-  if (typeof import.meta !== 'undefined' && import.meta.env) {
-    return import.meta.env[key] || '';
+  // Verificación defensiva de import.meta con cast a 'any' para evitar errores de TS (TS2339)
+  const meta = import.meta as any;
+  
+  if (typeof meta !== 'undefined' && meta.env) {
+    return meta.env[key] || '';
   }
   return '';
 };
