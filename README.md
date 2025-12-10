@@ -2,51 +2,56 @@
 
 Aplicación de votación para los premios Vladicamp 2025 impulsada por IA.
 
-## 🚀 Cómo iniciar un NUEVO repositorio (Desvincular el anterior)
+## 🚀 Cómo reiniciar el repositorio (Mac/Linux)
 
-Si quieres subir este proyecto a un nuevo repositorio de GitHub y borrar el historial anterior, ejecuta los siguientes comandos en tu terminal (en la carpeta raíz del proyecto):
+Si deseas desvincular este proyecto de un repositorio anterior y subirlo a uno nuevo, sigue estos pasos en tu **Terminal**:
 
-```bash
-# 1. Borrar el historial de git existente (Windows: rmdir /s /q .git)
-rm -rf .git
+1. **Navega a la carpeta del proyecto:**
+   Abre la terminal, escribe `cd` seguido de un espacio, arrastra la carpeta del proyecto a la terminal y pulsa Enter.
 
-# 2. Iniciar un nuevo repositorio limpio
-git init
+2. **Borra el historial de Git anterior:**
+   ```bash
+   rm -rf .git
+   ```
+   *(Si prefieres usar Finder: Presiona `Cmd + Shift + .` para ver archivos ocultos y borra la carpeta `.git` manualmente).*
 
-# 3. Agregar todos los archivos (El .gitignore evitará subir claves secretas)
-git add .
+3. **Inicia el nuevo repositorio:**
+   ```bash
+   git init
+   git add .
+   git commit -m "Initial commit: Vladicamp 2025 App Nuevo"
+   git branch -M main
+   ```
 
-# 4. Crear el primer commit
-git commit -m "Initial commit: Vladicamp 2025 App"
+4. **Vincula tu nuevo repositorio de GitHub:**
+   Crea un repositorio vacío en GitHub y copia el link (ej: `https://github.com/usuario/nuevo-repo.git`).
+   ```bash
+   git remote add origin https://github.com/TU_USUARIO/TU_NUEVO_REPO.git
+   git push -u origin main
+   ```
 
-# 5. Crear la rama principal
-git branch -M main
+## 🛠 Configuración para Desarrollo
 
-# 6. Vincular con tu nuevo repositorio de GitHub (crealo antes en github.com)
-git remote add origin https://github.com/TU_USUARIO/TU_NUEVO_REPO.git
+1.  **Variables de Entorno:**
+    Crea un archivo `.env` en la raíz (puedes duplicar el ejemplo si existe):
 
-# 7. Subir los archivos
-git push -u origin main
-```
+    ```env
+    API_KEY=tu_api_key_de_google_gemini
+    VITE_SUPABASE_URL=tu_url_de_supabase
+    VITE_SUPABASE_ANON_KEY=tu_key_anonima_de_supabase
+    ```
 
-## 🛠 Configuración
+2.  **Instalar Dependencias:**
+    ```bash
+    npm install
+    ```
 
-1.  Copia el archivo de ejemplo de variables de entorno (si existe) o crea un archivo `.env` en la raíz:
+3.  **Iniciar Servidor:**
+    ```bash
+    npm run dev
+    ```
 
-```env
-API_KEY=tu_api_key_de_google_gemini
-VITE_SUPABASE_URL=tu_url_de_supabase
-VITE_SUPABASE_ANON_KEY=tu_key_anonima_de_supabase
-```
+## ⚠️ Solución de Problemas Comunes
 
-2.  Instala las dependencias:
-
-```bash
-npm install
-```
-
-3.  Corre el servidor de desarrollo:
-
-```bash
-npm run dev
-```
+*   **Error "process is not defined":** Ya está solucionado en `vite.config.ts`.
+*   **Error de Supabase:** Asegúrate de que las credenciales en el `.env` sean correctas. Si falla localmente, puedes introducirlas manualmente en el panel de Admin (`/` -> "Ingresar como administrador").

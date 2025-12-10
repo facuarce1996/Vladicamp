@@ -5,11 +5,16 @@ export const generateVoteAnalysis = async (
   votes: VoteState,
   questions: Question[]
 ): Promise<string> => {
-  if (!process.env.API_KEY) {
-    return "Error: API Key no configurada. No se puede generar el análisis.";
+  // Intentar obtener la API KEY de ambas formas posibles (Inyección de Vite o Variable estándar)
+  // @ts-ignore
+  const apiKey = import.meta.env.VITE_API_KEY || (typeof process !== 'undefined' ? process.env.API_KEY : '') || '';
+
+  if (!apiKey) {
+    console.error("API Key faltante. Asegúrate de configurar VITE_API_KEY en tu archivo .env");
+    return "Error: API Key no configurada. No se puede generar el análisis. Avisale al administrador.";
   }
 
-  const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+  const ai = new GoogleGenAI({ apiKey: apiKey });
 
   // Format the votes for the prompt
   let votesSummary = "";

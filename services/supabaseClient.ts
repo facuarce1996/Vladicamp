@@ -1,29 +1,11 @@
 import { createClient } from '@supabase/supabase-js';
 
-// Helper function to get environment variables reliably across environments (Vite/Node)
-const getEnvVar = (key: string): string => {
-  // 1. Try Vite's import.meta.env (Standard for this project)
-  // @ts-ignore
-  if (typeof import.meta !== 'undefined' && import.meta.env && import.meta.env[key]) {
-    // @ts-ignore
-    return import.meta.env[key];
-  }
-  
-  // 2. Try process.env (Fallback or for build scripts)
-  // @ts-ignore
-  if (typeof process !== 'undefined' && process.env && process.env[key]) {
-    // @ts-ignore
-    return process.env[key];
-  }
+// En Vite, las variables de entorno se acceden via import.meta.env
+// Asegúrate de que tus variables en .env o en el panel de Vercel comiencen con VITE_
+const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
+const SUPABASE_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY;
 
-  return '';
-};
-
-// Config keys
-const SUPABASE_URL = getEnvVar('VITE_SUPABASE_URL');
-const SUPABASE_KEY = getEnvVar('VITE_SUPABASE_ANON_KEY') || getEnvVar('VITE_SUPABASE');
-
-// Runtime manual override (from Admin Panel LocalStorage)
+// Runtime manual override (desde el Panel Admin)
 const getManualConfig = () => {
   if (typeof window !== 'undefined') {
     return {
@@ -40,28 +22,23 @@ const finalKey = manualConfig.key || SUPABASE_KEY;
 
 let client;
 
-if (finalUrl && finalKey) {
+if (finalUrl && finalKey && finalUrl.startsWith('http')) {
   try {
-    // Validate URL syntax basically to avoid crash
-    if (finalUrl.startsWith('http')) {
-      client = createClient(finalUrl, finalKey);
-    } else {
-      console.warn('Supabase URL inválida detectada.');
-    }
+    client = createClient(finalUrl, finalKey);
   } catch (error) {
     console.error('Error inicializando Supabase:', error);
   }
 }
 
-// Export client or a safe mock to prevent "Cannot read properties of undefined"
+// Exportamos el cliente o un mock seguro para evitar que la app explote si faltan las keys
 export const supabase = client || {
   from: () => ({
     select: () => Promise.resolve({ 
       data: [], 
-      error: { message: 'Supabase no conectado. Configura las variables en .env o en el Panel Admin.' } 
+      error: { message: 'Supabase no conectado. Configura VITE_SUPABASE_URL y VITE_SUPABASE_ANON_KEY.' } 
     }),
     insert: () => Promise.resolve({ 
-      error: { message: 'Supabase no conectado. Configura las variables en .env o en el Panel Admin.' } 
+      error: { message: 'Supabase no conectado. Configura VITE_SUPABASE_URL y VITE_SUPABASE_ANON_KEY.' } 
     }),
     delete: () => ({
       neq: () => Promise.resolve({ error: { message: 'Supabase no conectado.' } })
