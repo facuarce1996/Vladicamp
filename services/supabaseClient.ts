@@ -5,4 +5,6 @@ import { SUPABASE_CONFIG } from '../supabaseConfig';
 // Esto asegura que funcione en todos los dispositivos (celulares, pc, etc)
 // sin depender de variables de entorno locales o configuraciones manuales.
 
+console.log("Inicializando Supabase con configuración estática:", SUPABASE_CONFIG.url);
+
 export const supabase = createClient(SUPABASE_CONFIG.url, SUPABASE_CONFIG.key);

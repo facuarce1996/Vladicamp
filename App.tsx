@@ -284,6 +284,7 @@ export default function App() {
               </>
             )}
           </button>
+          <p className="text-center text-slate-600 text-[10px] mt-2">v2.0 (Mobile Fix)</p>
         </div>
       </div>
     </div>
