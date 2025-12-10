@@ -7,6 +7,7 @@ import { Logo } from './components/Logo';
 import { QUESTIONS, CANDIDATES, shuffleArray } from './constants';
 import { VoteState, Submission } from './types';
 import { generateVoteAnalysis } from './services/geminiService';
+import { supabase } from './services/supabaseClient';
 import { Send, RotateCcw } from 'lucide-react';
 
 type ViewState = 'intro' | 'voting' | 'results' | 'admin';
@@ -19,20 +20,10 @@ export default function App() {
   const [analysisResult, setAnalysisResult] = useState<string | null>(null);
   
   // Admin & Persistence State
-  const [submissions, setSubmissions] = useState<Submission[]>([]);
   const [logoSrc, setLogoSrc] = useState<string | null>(null);
 
-  // Load data from LocalStorage on mount
+  // Load local settings on mount
   useEffect(() => {
-    const savedSubmissions = localStorage.getItem('vladicamp_submissions');
-    if (savedSubmissions) {
-      try {
-        setSubmissions(JSON.parse(savedSubmissions));
-      } catch (e) {
-        console.error("Failed to parse submissions", e);
-      }
-    }
-
     const savedLogo = localStorage.getItem('vladicamp_logo');
     if (savedLogo) {
       setLogoSrc(savedLogo);
@@ -109,11 +100,6 @@ export default function App() {
     reader.readAsDataURL(file);
   };
 
-  const handleClearData = () => {
-    setSubmissions([]);
-    localStorage.removeItem('vladicamp_submissions');
-  };
-
   // Helper for admin to reset their own device lock for testing
   const handleResetDeviceLock = () => {
     localStorage.removeItem('vladicamp_device_voted');
@@ -127,38 +113,48 @@ export default function App() {
     
     setIsSubmitting(true);
     
-    // Save submission locally
-    const newSubmission: Submission = {
-      email: email || "Anónimo",
-      timestamp: new Date().toISOString(),
-      votes
-    };
-    const updatedSubmissions = [...submissions, newSubmission];
-    setSubmissions(updatedSubmissions);
-    localStorage.setItem('vladicamp_submissions', JSON.stringify(updatedSubmissions));
+    try {
+      // 1. Save to Supabase
+      const { error } = await supabase
+        .from('votes')
+        .insert([
+          { 
+            email: email || "Anónimo",
+            votes: votes,
+            timestamp: new Date().toISOString()
+          }
+        ]);
 
-    // Lock device to prevent voting again
-    localStorage.setItem('vladicamp_device_voted', 'true');
-    // Clear draft
-    localStorage.removeItem('vladicamp_draft_votes');
+      if (error) {
+        console.error('Error saving to Supabase:', error);
+        alert("Hubo un error guardando los votos, pero se generará el análisis igual.");
+      }
 
-    // Generate Analysis
-    const result = await generateVoteAnalysis(votes, QUESTIONS);
-    
-    setAnalysisResult(result);
-    setIsSubmitting(false);
-    setView('results');
-    window.scrollTo(0, 0);
+      // 2. Lock device
+      localStorage.setItem('vladicamp_device_voted', 'true');
+      localStorage.removeItem('vladicamp_draft_votes');
 
-    // Auto-reset/Close session after 1 minute (60000ms)
-    setTimeout(() => {
-      // Reset state and return to intro smoothly instead of reloading
-      setVotes({});
-      setAnalysisResult(null);
-      setEmail('');
-      setView('intro');
+      // 3. Generate Analysis
+      const result = await generateVoteAnalysis(votes, QUESTIONS);
+      setAnalysisResult(result);
+      
+      setView('results');
       window.scrollTo(0, 0);
-    }, 60000);
+
+      // 4. Auto-reset/Close session
+      setTimeout(() => {
+        setVotes({});
+        setAnalysisResult(null);
+        setEmail('');
+        setView('intro');
+        window.scrollTo(0, 0);
+      }, 60000);
+
+    } catch (err) {
+      console.error("Unexpected error:", err);
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   const completedCount = Object.values(votes).filter((v) => typeof v === 'string' && v.trim().length > 0).length;
@@ -170,11 +166,9 @@ export default function App() {
   if (view === 'admin') {
     return (
       <AdminPanel 
-        submissions={submissions}
         logoSrc={logoSrc}
         onUpdateLogo={handleUpdateLogo}
         onLogout={() => setView('intro')}
-        onClearData={handleClearData}
         onResetDevice={handleResetDeviceLock}
       />
     );

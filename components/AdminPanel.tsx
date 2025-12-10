@@ -1,27 +1,54 @@
-import React, { useRef } from 'react';
+import React, { useRef, useEffect, useState } from 'react';
 import { QUESTIONS } from '../constants';
 import { Submission } from '../types';
 import { Logo } from './Logo';
-import { LogOut, Upload, Trash2, Download, Smartphone, Undo2 } from 'lucide-react';
+import { LogOut, Upload, Trash2, Download, Smartphone, Undo2, Loader2, RefreshCcw } from 'lucide-react';
+import { supabase } from '../services/supabaseClient';
 
 interface AdminPanelProps {
-  submissions: Submission[];
   logoSrc: string | null;
   onUpdateLogo: (file: File) => void;
   onLogout: () => void;
-  onClearData: () => void;
   onResetDevice: () => void;
 }
 
 export const AdminPanel: React.FC<AdminPanelProps> = ({ 
-  submissions, 
   logoSrc, 
   onUpdateLogo, 
   onLogout,
-  onClearData,
   onResetDevice
 }) => {
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const [submissions, setSubmissions] = useState<Submission[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  const fetchSubmissions = async () => {
+    setLoading(true);
+    const { data, error } = await supabase
+      .from('votes')
+      .select('*')
+      .order('created_at', { ascending: false });
+
+    if (error) {
+      console.error("Error fetching votes:", error);
+      alert("Error cargando los votos de la base de datos.");
+    } else {
+      // Map Supabase response to our Submission type
+      // Note: Supabase returns keys like 'created_at', our type expects 'timestamp'
+      // We'll adapt it here.
+      const formattedData: Submission[] = (data || []).map((row: any) => ({
+        email: row.email,
+        timestamp: row.created_at, // Map created_at to timestamp
+        votes: row.votes
+      }));
+      setSubmissions(formattedData);
+    }
+    setLoading(false);
+  };
+
+  useEffect(() => {
+    fetchSubmissions();
+  }, []);
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files[0]) {
@@ -29,11 +56,25 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
     }
   };
 
+  const handleClearData = async () => {
+    if(window.confirm('ATENCIÓN: Esto borrará TODOS los registros de la base de datos de Nube permanentemente. ¿Estás seguro?')) {
+       // Since we are using client-side key, DELETE might be restricted by RLS.
+       // For this app, we might need to delete rows one by one or enable delete policy.
+       const { error } = await supabase.from('votes').delete().neq('id', 0); // Delete all where id is not 0
+       if (error) {
+         alert("Error borrando datos (Revisar permisos RLS): " + error.message);
+       } else {
+         setSubmissions([]);
+         alert("Base de datos limpiada.");
+       }
+    }
+  };
+
   const downloadCSV = () => {
     const headers = ['Email', 'Fecha', ...QUESTIONS.map(q => q.text)];
     const rows = submissions.map(s => [
       s.email,
-      s.timestamp,
+      new Date(s.timestamp).toLocaleString(),
       ...QUESTIONS.map(q => s.votes[q.id] || '')
     ]);
 
@@ -130,7 +171,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                     <div className="flex items-start justify-between gap-4">
                         <div>
                             <h3 className="font-medium text-white">Desbloquear este dispositivo</h3>
-                            <p className="text-sm text-slate-400 mt-1">Permite volver a votar desde este navegador (útil para pruebas).</p>
+                            <p className="text-sm text-slate-400 mt-1">Permite volver a votar desde este navegador.</p>
                         </div>
                         <button 
                             onClick={onResetDevice}
@@ -144,19 +185,15 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
 
                      <div className="flex items-start justify-between gap-4">
                         <div>
-                            <h3 className="font-medium text-red-400">Borrar todos los votos</h3>
-                            <p className="text-sm text-slate-500 mt-1">Elimina permanentemente la base de datos local de respuestas.</p>
+                            <h3 className="font-medium text-red-400">Borrar Base de Datos</h3>
+                            <p className="text-sm text-slate-500 mt-1">Elimina permanentemente los registros de Supabase.</p>
                         </div>
                         <button 
-                            onClick={() => {
-                            if(window.confirm('¿Estás seguro de borrar todos los registros? Esta acción no se puede deshacer.')) {
-                                onClearData();
-                            }
-                            }}
+                            onClick={handleClearData}
                             className="bg-red-500/10 hover:bg-red-500/20 text-red-500 px-4 py-2 rounded-lg transition-colors text-sm font-medium border border-red-500/20 whitespace-nowrap"
                         >
                             <Trash2 size={16} />
-                            Borrar Todo
+                            Borrar DB
                         </button>
                     </div>
                 </div>
@@ -168,11 +205,19 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
         <div className="bg-slate-800 rounded-2xl border border-slate-700 shadow-xl overflow-hidden flex flex-col">
           <div className="p-6 border-b border-slate-700 flex flex-col md:flex-row justify-between items-center gap-4">
             <div>
-              <h2 className="text-xl font-bold text-white mb-1">Registros de Votación</h2>
+              <h2 className="text-xl font-bold text-white mb-1">Registros de Votación (Nube)</h2>
               <p className="text-slate-400 text-sm">{submissions.length} votos registrados</p>
             </div>
             
             <div className="flex gap-3">
+              <button 
+                onClick={fetchSubmissions}
+                className="flex items-center gap-2 bg-slate-700 hover:bg-slate-600 text-white px-4 py-2 rounded-lg transition-colors text-sm font-medium"
+              >
+                <RefreshCcw size={16} className={loading ? "animate-spin" : ""} />
+                Actualizar
+              </button>
+
               <button 
                 onClick={downloadCSV}
                 className="flex items-center gap-2 bg-slate-700 hover:bg-slate-600 text-white px-4 py-2 rounded-lg transition-colors text-sm font-medium"
@@ -198,10 +243,19 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-700/50">
-                {submissions.length === 0 ? (
+                {loading ? (
+                   <tr>
+                     <td colSpan={QUESTIONS.length + 2} className="px-6 py-12 text-center text-slate-500">
+                       <div className="flex flex-col items-center justify-center gap-2">
+                         <Loader2 className="animate-spin text-yellow-500" size={32} />
+                         <p>Cargando registros...</p>
+                       </div>
+                     </td>
+                   </tr>
+                ) : submissions.length === 0 ? (
                   <tr>
                     <td colSpan={QUESTIONS.length + 2} className="px-6 py-12 text-center text-slate-500">
-                      No hay registros todavía.
+                      No hay registros en la base de datos todavía.
                     </td>
                   </tr>
                 ) : (
