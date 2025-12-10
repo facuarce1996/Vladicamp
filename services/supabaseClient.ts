@@ -1,59 +1,70 @@
 import { createClient } from '@supabase/supabase-js';
 
-// Helper for safe environment variable access
-const getEnv = (key: string) => {
-  // Check for Vite/Modern Browser environment
+// Helper function to get environment variables reliably across environments (Vite/Node)
+const getEnvVar = (key: string): string => {
+  // 1. Try Vite's import.meta.env (Standard for this project)
   // @ts-ignore
   if (typeof import.meta !== 'undefined' && import.meta.env && import.meta.env[key]) {
     // @ts-ignore
     return import.meta.env[key];
   }
-  // Check for Node/Webpack/Vercel environment
+  
+  // 2. Try process.env (Fallback or for build scripts)
   // @ts-ignore
   if (typeof process !== 'undefined' && process.env && process.env[key]) {
     // @ts-ignore
     return process.env[key];
   }
+
   return '';
 };
 
-// 1. Try to get config from Environment Variables
-let supabaseUrl = getEnv('VITE_SUPABASE_URL');
-// Support standard naming OR the user specific 'VITE_SUPABASE'
-let supabaseKey = getEnv('VITE_SUPABASE_ANON_KEY') || getEnv('VITE_SUPABASE');
+// Config keys
+const SUPABASE_URL = getEnvVar('VITE_SUPABASE_URL');
+const SUPABASE_KEY = getEnvVar('VITE_SUPABASE_ANON_KEY') || getEnvVar('VITE_SUPABASE');
 
-// 2. If missing and we are in the browser, try to get from LocalStorage (Runtime Config)
-if (typeof window !== 'undefined') {
-  if (!supabaseUrl) supabaseUrl = localStorage.getItem('vladicamp_supabase_url') || '';
-  if (!supabaseKey) supabaseKey = localStorage.getItem('vladicamp_supabase_key') || '';
-}
+// Runtime manual override (from Admin Panel LocalStorage)
+const getManualConfig = () => {
+  if (typeof window !== 'undefined') {
+    return {
+      url: localStorage.getItem('vladicamp_supabase_url'),
+      key: localStorage.getItem('vladicamp_supabase_key')
+    };
+  }
+  return { url: null, key: null };
+};
+
+const manualConfig = getManualConfig();
+const finalUrl = manualConfig.url || SUPABASE_URL;
+const finalKey = manualConfig.key || SUPABASE_KEY;
 
 let client;
 
-// 3. Initialize with safety check
-try {
-  if (supabaseUrl && supabaseKey) {
-    // Validate URL format to prevent crash if user pasted a bad string
-    new URL(supabaseUrl);
-    client = createClient(supabaseUrl, supabaseKey);
+if (finalUrl && finalKey) {
+  try {
+    // Validate URL syntax basically to avoid crash
+    if (finalUrl.startsWith('http')) {
+      client = createClient(finalUrl, finalKey);
+    } else {
+      console.warn('Supabase URL inválida detectada.');
+    }
+  } catch (error) {
+    console.error('Error inicializando Supabase:', error);
   }
-} catch (e) {
-  console.warn("Supabase configuration invalid:", e);
-  // Fallthrough to mock client
 }
 
-// If credentials are valid, create the real client.
-// Otherwise, create a dummy object that mimics the API but returns errors.
-export const supabase = client
-  ? client
-  : {
-      from: () => ({
-        select: () => ({
-          order: () => Promise.resolve({ data: [], error: { message: 'Supabase no configurado. Faltan variables de entorno o configuración manual en Admin.' } }),
-        }),
-        insert: () => Promise.resolve({ error: { message: 'Supabase no configurado. Faltan variables de entorno o configuración manual en Admin.' } }),
-        delete: () => ({
-          neq: () => Promise.resolve({ error: { message: 'Supabase no configurado.' } })
-        })
-      })
-    } as any;
+// Export client or a safe mock to prevent "Cannot read properties of undefined"
+export const supabase = client || {
+  from: () => ({
+    select: () => Promise.resolve({ 
+      data: [], 
+      error: { message: 'Supabase no conectado. Configura las variables en .env o en el Panel Admin.' } 
+    }),
+    insert: () => Promise.resolve({ 
+      error: { message: 'Supabase no conectado. Configura las variables en .env o en el Panel Admin.' } 
+    }),
+    delete: () => ({
+      neq: () => Promise.resolve({ error: { message: 'Supabase no conectado.' } })
+    })
+  })
+} as any;
