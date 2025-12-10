@@ -1,0 +1,5 @@
+{
+  "name": "Vladicamp 2025 Awards",
+  "description": "Aplicación de votación para los premios Vladicamp 2025. Permite elegir candidatos para diversas ternas y genera un análisis divertido con IA.",
+  "requestFramePermissions": []
+}
