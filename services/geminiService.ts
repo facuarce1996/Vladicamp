@@ -5,17 +5,10 @@ export const generateVoteAnalysis = async (
   votes: VoteState,
   questions: Question[]
 ): Promise<string> => {
-  // Acceso seguro a la variable de entorno
-  let apiKey = '';
   
-  if (typeof import.meta !== 'undefined' && import.meta.env) {
-    apiKey = import.meta.env.VITE_API_KEY || '';
-  }
-  
-  // Fallback para process.env (compatibilidad)
-  if (!apiKey && typeof process !== 'undefined' && process.env) {
-    apiKey = process.env.API_KEY || '';
-  }
+  // Obtenemos la key inyectada por vite.config.ts o desde el entorno directo
+  // @ts-ignore
+  const apiKey = process.env.API_KEY || (import.meta.env && import.meta.env.VITE_API_KEY);
 
   if (!apiKey) {
     console.error("API Key faltante. Asegúrate de configurar VITE_API_KEY en tu archivo .env");

@@ -3,13 +3,13 @@ import react from '@vitejs/plugin-react'
 
 // https://vitejs.dev/config/
 export default defineConfig(({ mode }) => {
+  // Carga las variables de entorno sin importar si es process.env o import.meta
   const env = loadEnv(mode, process.cwd(), '');
   
   return {
     plugins: [react()],
     define: {
-      // Mantenemos la compatibilidad con process.env para librerías que lo requieran,
-      // pero recomendamos usar import.meta.env.VITE_API_KEY
+      // Inyectamos la API KEY globalmente para asegurar compatibilidad
       'process.env.API_KEY': JSON.stringify(env.API_KEY || env.VITE_API_KEY || ''),
     }
   }
