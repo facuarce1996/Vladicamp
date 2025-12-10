@@ -19,21 +19,33 @@ const getEnv = (key: string) => {
 
 // 1. Try to get config from Environment Variables
 let supabaseUrl = getEnv('VITE_SUPABASE_URL');
-let supabaseKey = getEnv('VITE_SUPABASE_ANON_KEY');
+// Support standard naming OR the user specific 'VITE_SUPABASE'
+let supabaseKey = getEnv('VITE_SUPABASE_ANON_KEY') || getEnv('VITE_SUPABASE');
 
 // 2. If missing and we are in the browser, try to get from LocalStorage (Runtime Config)
-if ((!supabaseUrl || !supabaseKey) && typeof window !== 'undefined') {
-  const storedUrl = localStorage.getItem('vladicamp_supabase_url');
-  const storedKey = localStorage.getItem('vladicamp_supabase_key');
-  
-  if (storedUrl) supabaseUrl = storedUrl;
-  if (storedKey) supabaseKey = storedKey;
+if (typeof window !== 'undefined') {
+  if (!supabaseUrl) supabaseUrl = localStorage.getItem('vladicamp_supabase_url') || '';
+  if (!supabaseKey) supabaseKey = localStorage.getItem('vladicamp_supabase_key') || '';
+}
+
+let client;
+
+// 3. Initialize with safety check
+try {
+  if (supabaseUrl && supabaseKey) {
+    // Validate URL format to prevent crash if user pasted a bad string
+    new URL(supabaseUrl);
+    client = createClient(supabaseUrl, supabaseKey);
+  }
+} catch (e) {
+  console.warn("Supabase configuration invalid:", e);
+  // Fallthrough to mock client
 }
 
 // If credentials are valid, create the real client.
-// Otherwise, create a dummy object that mimics the API but returns errors, preventing a crash.
-export const supabase = (supabaseUrl && supabaseKey)
-  ? createClient(supabaseUrl, supabaseKey)
+// Otherwise, create a dummy object that mimics the API but returns errors.
+export const supabase = client
+  ? client
   : {
       from: () => ({
         select: () => ({
