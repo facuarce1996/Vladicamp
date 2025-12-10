@@ -1,9 +1,16 @@
 import { createClient } from '@supabase/supabase-js';
 
-// En Vite, las variables de entorno se acceden via import.meta.env
-// Asegúrate de que tus variables en .env o en el panel de Vercel comiencen con VITE_
-const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
-const SUPABASE_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY;
+// Acceso seguro a variables de entorno para evitar "Cannot read properties of undefined"
+const getEnvVar = (key: string) => {
+  // Verificación defensiva de import.meta
+  if (typeof import.meta !== 'undefined' && import.meta.env) {
+    return import.meta.env[key] || '';
+  }
+  return '';
+};
+
+const SUPABASE_URL = getEnvVar('VITE_SUPABASE_URL');
+const SUPABASE_KEY = getEnvVar('VITE_SUPABASE_ANON_KEY');
 
 // Runtime manual override (desde el Panel Admin)
 const getManualConfig = () => {

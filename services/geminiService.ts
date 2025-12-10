@@ -5,9 +5,17 @@ export const generateVoteAnalysis = async (
   votes: VoteState,
   questions: Question[]
 ): Promise<string> => {
-  // Intentar obtener la API KEY de ambas formas posibles (Inyección de Vite o Variable estándar)
-  // @ts-ignore
-  const apiKey = import.meta.env.VITE_API_KEY || (typeof process !== 'undefined' ? process.env.API_KEY : '') || '';
+  // Acceso seguro a la variable de entorno
+  let apiKey = '';
+  
+  if (typeof import.meta !== 'undefined' && import.meta.env) {
+    apiKey = import.meta.env.VITE_API_KEY || '';
+  }
+  
+  // Fallback para process.env (compatibilidad)
+  if (!apiKey && typeof process !== 'undefined' && process.env) {
+    apiKey = process.env.API_KEY || '';
+  }
 
   if (!apiKey) {
     console.error("API Key faltante. Asegúrate de configurar VITE_API_KEY en tu archivo .env");
