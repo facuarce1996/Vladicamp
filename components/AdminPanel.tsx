@@ -2,7 +2,7 @@ import React, { useRef, useEffect, useState } from 'react';
 import { QUESTIONS } from '../constants';
 import { Submission } from '../types';
 import { Logo } from './Logo';
-import { LogOut, Upload, Trash2, Download, Smartphone, Undo2, Loader2, RefreshCcw } from 'lucide-react';
+import { LogOut, Upload, Trash2, Download, Smartphone, Undo2, Loader2, RefreshCcw, Database, Save } from 'lucide-react';
 import { supabase } from '../services/supabaseClient';
 
 interface AdminPanelProps {
@@ -21,6 +21,10 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [submissions, setSubmissions] = useState<Submission[]>([]);
   const [loading, setLoading] = useState(true);
+  
+  // DB Config State
+  const [dbUrl, setDbUrl] = useState('');
+  const [dbKey, setDbKey] = useState('');
 
   const fetchSubmissions = async () => {
     setLoading(true);
@@ -31,14 +35,11 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
 
     if (error) {
       console.error("Error fetching votes:", error);
-      alert("Error cargando los votos de la base de datos.");
+      // Don't alert immediately on load to avoid spamming if not configured
     } else {
-      // Map Supabase response to our Submission type
-      // Note: Supabase returns keys like 'created_at', our type expects 'timestamp'
-      // We'll adapt it here.
       const formattedData: Submission[] = (data || []).map((row: any) => ({
         email: row.email,
-        timestamp: row.created_at, // Map created_at to timestamp
+        timestamp: row.created_at,
         votes: row.votes
       }));
       setSubmissions(formattedData);
@@ -48,7 +49,24 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
 
   useEffect(() => {
     fetchSubmissions();
+    
+    // Load existing manual config
+    const storedUrl = localStorage.getItem('vladicamp_supabase_url');
+    const storedKey = localStorage.getItem('vladicamp_supabase_key');
+    if(storedUrl) setDbUrl(storedUrl);
+    if(storedKey) setDbKey(storedKey);
   }, []);
+
+  const handleSaveDbConfig = () => {
+    if (!dbUrl || !dbKey) {
+        alert("Por favor completa URL y Key");
+        return;
+    }
+    localStorage.setItem('vladicamp_supabase_url', dbUrl.trim());
+    localStorage.setItem('vladicamp_supabase_key', dbKey.trim());
+    alert('Configuración guardada. La página se recargará para aplicar los cambios.');
+    window.location.reload();
+  };
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files[0]) {
@@ -58,11 +76,9 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
 
   const handleClearData = async () => {
     if(window.confirm('ATENCIÓN: Esto borrará TODOS los registros de la base de datos de Nube permanentemente. ¿Estás seguro?')) {
-       // Since we are using client-side key, DELETE might be restricted by RLS.
-       // For this app, we might need to delete rows one by one or enable delete policy.
-       const { error } = await supabase.from('votes').delete().neq('id', 0); // Delete all where id is not 0
+       const { error } = await supabase.from('votes').delete().neq('id', 0);
        if (error) {
-         alert("Error borrando datos (Revisar permisos RLS): " + error.message);
+         alert("Error borrando datos (Revisar permisos RLS): " + (error.message || "Desconocido"));
        } else {
          setSubmissions([]);
          alert("Base de datos limpiada.");
@@ -113,6 +129,48 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
           </button>
         </div>
 
+        {/* Database Configuration Section */}
+        <div className="bg-slate-800 p-6 rounded-2xl border border-slate-700 shadow-xl">
+            <h2 className="text-xl font-bold text-white mb-6 flex items-center gap-2">
+                <Database size={20} className="text-emerald-500" />
+                Conexión a Supabase (Base de Datos)
+            </h2>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="space-y-2">
+                    <label className="text-sm font-medium text-slate-400">Project URL</label>
+                    <input 
+                        type="text" 
+                        value={dbUrl}
+                        onChange={(e) => setDbUrl(e.target.value)}
+                        placeholder="https://xyz.supabase.co"
+                        className="w-full bg-slate-900 border border-slate-600 rounded-lg px-4 py-2 text-white focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                    />
+                </div>
+                <div className="space-y-2">
+                    <label className="text-sm font-medium text-slate-400">API Key (anon/public)</label>
+                    <input 
+                        type="password" 
+                        value={dbKey}
+                        onChange={(e) => setDbKey(e.target.value)}
+                        placeholder="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+                        className="w-full bg-slate-900 border border-slate-600 rounded-lg px-4 py-2 text-white focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                    />
+                </div>
+            </div>
+            <div className="mt-4 flex justify-end">
+                <button 
+                    onClick={handleSaveDbConfig}
+                    className="flex items-center gap-2 bg-emerald-600 hover:bg-emerald-500 text-white px-6 py-2 rounded-lg transition-colors font-medium"
+                >
+                    <Save size={18} />
+                    Guardar y Recargar
+                </button>
+            </div>
+            <p className="text-xs text-slate-500 mt-2">
+                * Si usas Vercel con variables de entorno, esto no es necesario. Úsalo si te aparece "Error [object Object]".
+            </p>
+        </div>
+
         {/* Configuration Actions */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
             
@@ -142,7 +200,6 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                 </div>
                 
                 <div className="flex-1 flex flex-col items-center justify-center bg-slate-900/50 rounded-xl p-6 border border-slate-700 h-40 w-full relative group">
-                    {/* Add reset button for logo */}
                     {logoSrc && (
                        <button 
                          onClick={() => {

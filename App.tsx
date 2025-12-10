@@ -126,8 +126,13 @@ export default function App() {
         ]);
 
       if (error) {
-        console.error('Error saving to Supabase:', error);
-        alert("Hubo un error guardando los votos, pero se generará el análisis igual.");
+        // Safe error logging
+        const errorMessage = (error && typeof error === 'object' && 'message' in error) 
+           ? (error as any).message 
+           : JSON.stringify(error);
+        
+        console.error('Error saving to Supabase:', errorMessage);
+        alert(`Hubo un error guardando los votos (${errorMessage}), pero se generará el análisis igual. \n\nTip: Avisale al admin que configure la base de datos.`);
       }
 
       // 2. Lock device

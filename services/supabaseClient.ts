@@ -17,8 +17,18 @@ const getEnv = (key: string) => {
   return '';
 };
 
-const supabaseUrl = getEnv('VITE_SUPABASE_URL');
-const supabaseKey = getEnv('VITE_SUPABASE_ANON_KEY');
+// 1. Try to get config from Environment Variables
+let supabaseUrl = getEnv('VITE_SUPABASE_URL');
+let supabaseKey = getEnv('VITE_SUPABASE_ANON_KEY');
+
+// 2. If missing and we are in the browser, try to get from LocalStorage (Runtime Config)
+if ((!supabaseUrl || !supabaseKey) && typeof window !== 'undefined') {
+  const storedUrl = localStorage.getItem('vladicamp_supabase_url');
+  const storedKey = localStorage.getItem('vladicamp_supabase_key');
+  
+  if (storedUrl) supabaseUrl = storedUrl;
+  if (storedKey) supabaseKey = storedKey;
+}
 
 // If credentials are valid, create the real client.
 // Otherwise, create a dummy object that mimics the API but returns errors, preventing a crash.
@@ -27,9 +37,9 @@ export const supabase = (supabaseUrl && supabaseKey)
   : {
       from: () => ({
         select: () => ({
-          order: () => Promise.resolve({ data: [], error: { message: 'Supabase no configurado. Faltan variables de entorno.' } }),
+          order: () => Promise.resolve({ data: [], error: { message: 'Supabase no configurado. Faltan variables de entorno o configuración manual en Admin.' } }),
         }),
-        insert: () => Promise.resolve({ error: { message: 'Supabase no configurado. Faltan variables de entorno.' } }),
+        insert: () => Promise.resolve({ error: { message: 'Supabase no configurado. Faltan variables de entorno o configuración manual en Admin.' } }),
         delete: () => ({
           neq: () => Promise.resolve({ error: { message: 'Supabase no configurado.' } })
         })
