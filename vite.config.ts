@@ -9,7 +9,7 @@ export default defineConfig(({ mode }) => {
   return {
     plugins: [react()],
     define: {
-      // Define process.env.API_KEY to allow the Gemini SDK to work as requested in the prompt
+      // Define process.env.API_KEY to allow the Gemini SDK to work as requested
       'process.env.API_KEY': JSON.stringify(env.API_KEY),
     }
   }
